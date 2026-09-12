@@ -1,0 +1,338 @@
+// Tractor 360° - Prisma Schema
+// Database: SQLite (dev) | PostgreSQL (prod)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS (SQLite uses String) ───────────────────────────────────────────────
+
+// User roles
+// ADMIN | MANAGER | SERVICE_MANAGER | DEALER | TECHNICIAN | VIEWER
+
+// Tractor status
+// ACTIVE | INACTIVE | UNDER_SERVICE | SOLD | SCRAPPED
+
+// Service status
+// NEW | ASSIGNED | IN_PROGRESS | WAITING_FOR_PART | COMPLETED | CLOSED
+
+// Complaint status
+// OPEN | IN_PROGRESS | RESOLVED | CLOSED | ESCALATED
+
+// Warranty status
+// ACTIVE | EXPIRED | VOID | CLAIMED
+
+// Part stock status
+// IN_STOCK | LOW_STOCK | OUT_OF_STOCK
+
+// ─── USER ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("VIEWER") // ADMIN | MANAGER | SERVICE_MANAGER | DEALER | TECHNICIAN | VIEWER
+  avatar    String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dataImports DataImport[]
+}
+
+// ─── CUSTOMER ─────────────────────────────────────────────────────────────────
+
+model Customer {
+  id          String   @id @default(cuid())
+  customerId  String   @unique // e.g. CUS-001
+  name        String
+  phone       String
+  email       String?
+  address     String?
+  city        String
+  state       String
+  pincode     String?
+  type        String   @default("INDIVIDUAL") // INDIVIDUAL | COMPANY
+  companyName String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tractors   Tractor[]
+  sales      Sale[]
+  complaints Complaint[]
+}
+
+// ─── TRACTOR MODEL ────────────────────────────────────────────────────────────
+
+model TractorModel {
+  id          String   @id @default(cuid())
+  modelCode   String   @unique // e.g. TX-50
+  modelName   String   // e.g. PowerMaster 50
+  category    String   // e.g. 50HP | 60HP | 75HP
+  horsePower  Int
+  engineType  String   // e.g. Diesel
+  description String?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+
+  tractors Tractor[]
+}
+
+// ─── DEALER ───────────────────────────────────────────────────────────────────
+
+model Dealer {
+  id           String   @id @default(cuid())
+  dealerId     String   @unique // e.g. DLR-001
+  name         String
+  ownerName    String
+  phone        String
+  email        String?
+  address      String
+  city         String
+  state        String
+  pincode      String?
+  region       String   // North | South | East | West | Central
+  isActive     Boolean  @default(true)
+  joinedDate   DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tractors   Tractor[]
+  sales      Sale[]
+  spareParts SparePart[]
+}
+
+// ─── TRACTOR ──────────────────────────────────────────────────────────────────
+
+model Tractor {
+  id               String   @id @default(cuid())
+  tractorId        String   @unique // e.g. TR-001
+  chassisNumber    String   @unique
+  engineNumber     String   @unique
+  registrationNo   String?  @unique
+  color            String?
+  status           String   @default("ACTIVE") // ACTIVE | INACTIVE | UNDER_SERVICE | SOLD | SCRAPPED
+  purchaseDate     DateTime
+  region           String
+
+  // Relations
+  modelId    String
+  customerId String
+  dealerId   String
+
+  model    TractorModel @relation(fields: [modelId], references: [id])
+  customer Customer     @relation(fields: [customerId], references: [id])
+  dealer   Dealer       @relation(fields: [dealerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sale            Sale?
+  serviceRecords  ServiceRecord[]
+  complaints      Complaint[]
+  warranty        Warranty?
+}
+
+// ─── SALE ─────────────────────────────────────────────────────────────────────
+
+model Sale {
+  id            String   @id @default(cuid())
+  saleId        String   @unique // e.g. SL-001
+  invoiceNumber String   @unique
+  saleDate      DateTime
+  amount        Float
+  discount      Float    @default(0)
+  finalAmount   Float
+  paymentMode   String   // CASH | LOAN | EMI
+  loanBank      String?
+  salesperson   String
+  remarks       String?
+
+  tractorId  String @unique
+  customerId String
+  dealerId   String
+
+  tractor  Tractor  @relation(fields: [tractorId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  dealer   Dealer   @relation(fields: [dealerId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// ─── TECHNICIAN ───────────────────────────────────────────────────────────────
+
+model Technician {
+  id           String   @id @default(cuid())
+  techId       String   @unique // e.g. TECH-001
+  name         String
+  phone        String
+  email        String?
+  specialization String  // Engine | Hydraulic | Electrical | General
+  city         String
+  state        String
+  region       String
+  isActive     Boolean  @default(true)
+  joinedDate   DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  serviceRecords ServiceRecord[]
+  complaints     Complaint[]
+}
+
+// ─── SERVICE RECORD ───────────────────────────────────────────────────────────
+
+model ServiceRecord {
+  id            String   @id @default(cuid())
+  serviceId     String   @unique // e.g. SRV-001
+  serviceDate   DateTime
+  serviceType   String   // SCHEDULED | BREAKDOWN | WARRANTY | PREVENTIVE
+  problemReported String
+  workPerformed String?
+  cost          Float    @default(0)
+  status        String   @default("NEW") // NEW | ASSIGNED | IN_PROGRESS | WAITING_FOR_PART | COMPLETED | CLOSED
+  priority      String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  completedDate DateTime?
+  remarks       String?
+
+  tractorId    String
+  technicianId String?
+
+  tractor    Tractor     @relation(fields: [tractorId], references: [id])
+  technician Technician? @relation(fields: [technicianId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  serviceParts ServicePart[]
+}
+
+// ─── COMPLAINT ────────────────────────────────────────────────────────────────
+
+model Complaint {
+  id           String   @id @default(cuid())
+  complaintId  String   @unique // e.g. CMP-001
+  category     String   // Engine | Hydraulic | Electrical | Transmission | Brake | Clutch | PTO | Starting | Other
+  description  String
+  priority     String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  status       String   @default("OPEN") // OPEN | IN_PROGRESS | RESOLVED | CLOSED | ESCALATED
+  resolution   String?
+  createdDate  DateTime @default(now())
+  resolvedDate DateTime?
+  remarks      String?
+
+  tractorId    String
+  customerId   String
+  technicianId String?
+
+  tractor    Tractor    @relation(fields: [tractorId], references: [id])
+  customer   Customer   @relation(fields: [customerId], references: [id])
+  technician Technician? @relation(fields: [technicianId], references: [id])
+
+  updatedAt DateTime @updatedAt
+}
+
+// ─── WARRANTY ─────────────────────────────────────────────────────────────────
+
+model Warranty {
+  id            String   @id @default(cuid())
+  warrantyId    String   @unique // e.g. WRN-001
+  startDate     DateTime
+  endDate       DateTime
+  coverage      String   // FULL | PARTIAL | ENGINE_ONLY
+  status        String   @default("ACTIVE") // ACTIVE | EXPIRED | VOID | CLAIMED
+  terms         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tractorId String @unique
+  tractor   Tractor @relation(fields: [tractorId], references: [id])
+
+  claims WarrantyClaim[]
+}
+
+// ─── WARRANTY CLAIM ───────────────────────────────────────────────────────────
+
+model WarrantyClaim {
+  id          String   @id @default(cuid())
+  claimId     String   @unique // e.g. WRC-001
+  claimDate   DateTime
+  description String
+  amount      Float    @default(0)
+  status      String   @default("PENDING") // PENDING | APPROVED | REJECTED | SETTLED
+  approvedBy  String?
+  settledDate DateTime?
+  remarks     String?
+
+  warrantyId String
+  warranty   Warranty @relation(fields: [warrantyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── SPARE PART ───────────────────────────────────────────────────────────────
+
+model SparePart {
+  id           String   @id @default(cuid())
+  partNumber   String   @unique // e.g. PRT-001
+  partName     String
+  category     String   // Engine | Hydraulic | Electrical | Transmission | Brake | Filter | Body | Other
+  currentStock Int      @default(0)
+  minimumStock Int      @default(5)
+  unitPrice    Float
+  supplier     String?
+  stockStatus  String   @default("IN_STOCK") // IN_STOCK | LOW_STOCK | OUT_OF_STOCK
+  description  String?
+
+  dealerId String?
+  dealer   Dealer?   @relation(fields: [dealerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  serviceParts ServicePart[]
+}
+
+// ─── SERVICE PART (Junction) ──────────────────────────────────────────────────
+
+model ServicePart {
+  id              String   @id @default(cuid())
+  quantity        Int      @default(1)
+  unitCost        Float
+  totalCost       Float
+  replacementDate DateTime @default(now())
+
+  serviceRecordId String
+  sparePartId     String
+
+  serviceRecord ServiceRecord @relation(fields: [serviceRecordId], references: [id])
+  sparePart     SparePart     @relation(fields: [sparePartId], references: [id])
+}
+
+// ─── DATA IMPORT ──────────────────────────────────────────────────────────────
+
+model DataImport {
+  id            String   @id @default(cuid())
+  fileName      String
+  importType    String   // Tractor | Customer | Sales | Service | Complaint | Warranty | SpareParts | Dealer | Technician
+  totalRecords  Int      @default(0)
+  validRecords  Int      @default(0)
+  invalidRecords Int     @default(0)
+  duplicates    Int      @default(0)
+  imported      Int      @default(0)
+  status        String   @default("PENDING") // PENDING | PROCESSING | COMPLETED | FAILED
+  errors        String?  // JSON string of errors
+  createdAt     DateTime @default(now())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+}
