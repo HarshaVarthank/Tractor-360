@@ -249,7 +249,7 @@ export default function OverviewPage() {
                   outerRadius={80}
                   innerRadius={45}
                   paddingAngle={4}
-                  label={({ region, tractors }) => `${region}: ${tractors}`}
+                  label={(props: any) => `${props.region || props.name}: ${props.tractors || props.value}`}
                 >
                   {regionDistribution.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

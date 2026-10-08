@@ -48,20 +48,29 @@ export async function POST(req: NextRequest) {
             continue
           }
 
-          const total = await prisma.customer.count()
-          const customerId = row.customerId || `CUS-${String(total + 1).padStart(3, '0')}`
+          let customerId = row.customerId
+          if (!customerId) {
+            const total = await prisma.customer.count()
+            let counter = total + 1
+            while (await prisma.customer.findUnique({ where: { customerId: `CUS-${String(counter).padStart(3, '0')}` } })) {
+              counter++
+            }
+            customerId = `CUS-${String(counter).padStart(3, '0')}`
+          }
 
           await prisma.customer.create({
             data: {
               customerId,
-              name: row.name,
-              phone: String(row.phone),
-              email: row.email || null,
-              address: row.address || null,
-              city: row.city || 'Ludhiana',
-              state: row.state || 'Punjab',
+              name: String(row.name),
+              phone: String(row.phone).trim(),
+              email: row.email ? String(row.email).trim() : null,
+              address: row.address ? String(row.address) : null,
+              city: row.city ? String(row.city) : 'Ludhiana',
+              state: row.state ? String(row.state) : 'Punjab',
               pincode: row.pincode ? String(row.pincode) : null,
-              type: row.type || 'INDIVIDUAL',
+              type: ['INDIVIDUAL', 'COMMERCIAL', 'GOVERNMENT', 'DEALER_AFFILIATE'].includes(String(row.type).toUpperCase())
+                ? String(row.type).toUpperCase()
+                : 'INDIVIDUAL',
             },
           })
           importedCount++
@@ -78,8 +87,15 @@ export async function POST(req: NextRequest) {
             continue
           }
 
-          const total = await prisma.sparePart.count()
-          const partNumber = row.partNumber || `PRT-${String(total + 1).padStart(3, '0')}`
+          let partNumber = row.partNumber
+          if (!partNumber) {
+            const total = await prisma.sparePart.count()
+            let counter = total + 1
+            while (await prisma.sparePart.findUnique({ where: { partNumber: `PRT-${String(counter).padStart(3, '0')}` } })) {
+              counter++
+            }
+            partNumber = `PRT-${String(counter).padStart(3, '0')}`
+          }
 
           const existing = await prisma.sparePart.findUnique({
             where: { partNumber },
@@ -90,20 +106,121 @@ export async function POST(req: NextRequest) {
             continue
           }
 
-          const stock = parseInt(row.currentStock || '0')
-          const minStock = parseInt(row.minimumStock || '5')
+          const stock = parseInt(row.currentStock || '0', 10)
+          const minStock = parseInt(row.minimumStock || '5', 10)
 
           await prisma.sparePart.create({
             data: {
               partNumber,
-              partName: row.partName,
-              category: row.category || 'General',
-              currentStock: stock,
-              minimumStock: minStock,
-              unitPrice: parseFloat(row.unitPrice),
-              supplier: row.supplier || null,
+              partName: String(row.partName),
+              category: row.category ? String(row.category) : 'General',
+              currentStock: isNaN(stock) ? 0 : stock,
+              minimumStock: isNaN(minStock) ? 5 : minStock,
+              unitPrice: parseFloat(row.unitPrice) || 0,
+              supplier: row.supplier ? String(row.supplier) : null,
               stockStatus:
                 stock <= 0 ? 'OUT_OF_STOCK' : stock <= minStock ? 'LOW_STOCK' : 'IN_STOCK',
+            },
+          })
+          importedCount++
+        } catch (e: any) {
+          invalidCount++
+          errors.push(e.message)
+        }
+      }
+    } else if (importType === 'Tractor') {
+      const defaultModel = await prisma.tractorModel.findFirst()
+      const defaultCustomer = await prisma.customer.findFirst()
+      const defaultDealer = await prisma.dealer.findFirst()
+
+      if (!defaultModel || !defaultCustomer || !defaultDealer) {
+        return NextResponse.json(
+          { error: 'Cannot import tractors: requires existing model, customer, and dealer.' },
+          { status: 400 }
+        )
+      }
+
+      for (const row of records) {
+        try {
+          if (!row.chassisNumber || !row.engineNumber) {
+            invalidCount++
+            errors.push(`Row missing chassisNumber or engineNumber: ${JSON.stringify(row)}`)
+            continue
+          }
+
+          const existing = await prisma.tractor.findFirst({
+            where: {
+              OR: [
+                { chassisNumber: String(row.chassisNumber).trim() },
+                { engineNumber: String(row.engineNumber).trim() },
+              ],
+            },
+          })
+
+          if (existing) {
+            duplicateCount++
+            continue
+          }
+
+          let modelId = defaultModel.id
+          if (row.modelName) {
+            const foundModel = await prisma.tractorModel.findFirst({
+              where: { modelName: { contains: String(row.modelName).trim() } },
+            })
+            if (foundModel) modelId = foundModel.id
+          }
+
+          let customerId = defaultCustomer.id
+          if (row.customerPhone) {
+            const foundCustomer = await prisma.customer.findFirst({
+              where: { phone: String(row.customerPhone).trim() },
+            })
+            if (foundCustomer) customerId = foundCustomer.id
+          } else if (row.customerId) {
+            const foundCustomer = await prisma.customer.findFirst({
+              where: { customerId: String(row.customerId).trim() },
+            })
+            if (foundCustomer) customerId = foundCustomer.id
+          }
+
+          let dealerId = defaultDealer.id
+          if (row.dealerId) {
+            const foundDealer = await prisma.dealer.findFirst({
+              where: { dealerId: String(row.dealerId).trim() },
+            })
+            if (foundDealer) dealerId = foundDealer.id
+          } else if (row.dealerName) {
+            const foundDealer = await prisma.dealer.findFirst({
+              where: { name: { contains: String(row.dealerName).trim() } },
+            })
+            if (foundDealer) dealerId = foundDealer.id
+          }
+
+          let tractorId = row.tractorId
+          if (!tractorId) {
+            const total = await prisma.tractor.count()
+            let counter = total + 1
+            while (await prisma.tractor.findUnique({ where: { tractorId: `TR-${String(counter).padStart(3, '0')}` } })) {
+              counter++
+            }
+            tractorId = `TR-${String(counter).padStart(3, '0')}`
+          }
+
+          await prisma.tractor.create({
+            data: {
+              tractorId,
+              chassisNumber: String(row.chassisNumber).trim(),
+              engineNumber: String(row.engineNumber).trim(),
+              registrationNo: row.registrationNo ? String(row.registrationNo).trim() : null,
+              color: row.color ? String(row.color) : 'Classic Red',
+              status: ['ACTIVE', 'INACTIVE', 'UNDER_SERVICE', 'SOLD', 'SCRAPPED'].includes(String(row.status).toUpperCase())
+                ? String(row.status).toUpperCase()
+                : 'ACTIVE',
+              region: row.region ? String(row.region) : defaultDealer.region || 'North',
+              purchaseDate: row.purchaseDate ? new Date(row.purchaseDate) : new Date(),
+              modelId,
+              customerId,
+              dealerId,
             },
           })
           importedCount++

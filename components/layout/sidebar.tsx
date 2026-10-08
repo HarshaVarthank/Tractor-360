@@ -21,7 +21,20 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const navigation = [
+interface NavItem {
+  name: string
+  href: string
+  icon: any
+  count?: number
+  highlight?: boolean
+}
+
+interface NavSection {
+  category: string
+  items: NavItem[]
+}
+
+const navigation: NavSection[] = [
   {
     category: 'Core Operations',
     items: [

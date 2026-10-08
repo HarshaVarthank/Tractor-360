@@ -86,10 +86,12 @@ export default function ServicePage() {
           className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500"
         >
           <option value="ALL">All Statuses</option>
-          <option value="COMPLETED">COMPLETED</option>
-          <option value="IN_PROGRESS">IN PROGRESS</option>
           <option value="NEW">NEW</option>
+          <option value="ASSIGNED">ASSIGNED</option>
+          <option value="IN_PROGRESS">IN PROGRESS</option>
           <option value="WAITING_FOR_PART">WAITING FOR PART</option>
+          <option value="COMPLETED">COMPLETED</option>
+          <option value="CLOSED">CLOSED</option>
         </select>
       </div>
 

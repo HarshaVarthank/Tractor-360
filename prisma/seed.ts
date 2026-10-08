@@ -262,7 +262,7 @@ async function main() {
   const priorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
   const complaintStatuses = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'ESCALATED']
 
-  const complaintDescriptions = {
+  const complaintDescriptions: Record<string, string[]> = {
     'Engine': ['Engine overheating in heavy load', 'Excessive engine noise during startup', 'Loss of engine power at high RPM', 'Black smoke from exhaust'],
     'Hydraulic': ['Hydraulic lift not raising properly', 'Hydraulic oil leakage from rear', 'Slow hydraulic response time', 'Hydraulic pump making noise'],
     'Electrical': ['Battery not charging', 'Starter motor not engaging', 'Warning lights not working', 'Alternator failure'],

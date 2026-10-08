@@ -13,6 +13,7 @@ import {
   FileCheck,
 } from 'lucide-react'
 import Papa from 'papaparse'
+import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { formatDate } from '@/lib/utils'
 
@@ -45,18 +46,38 @@ export default function ImportPage() {
     if (!uploaded) return
     setFile(uploaded)
 
-    Papa.parse(uploaded, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        setParsedData(results.data)
-        setStep(2)
-        toast.success(`Successfully parsed ${results.data.length} records`)
-      },
-      error: (err) => {
-        toast.error(`Error parsing file: ${err.message}`)
-      },
-    })
+    const isExcel = uploaded.name.endsWith('.xlsx') || uploaded.name.endsWith('.xls')
+    if (isExcel) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        try {
+          const buffer = event.target?.result as ArrayBuffer
+          const workbook = XLSX.read(buffer, { type: 'array' })
+          const firstSheet = workbook.SheetNames[0]
+          const sheet = workbook.Sheets[firstSheet]
+          const jsonData = XLSX.utils.sheet_to_json<any>(sheet)
+          setParsedData(jsonData)
+          setStep(2)
+          toast.success(`Successfully parsed ${jsonData.length} records from Excel`)
+        } catch (err: any) {
+          toast.error(`Error parsing Excel file: ${err.message}`)
+        }
+      }
+      reader.readAsArrayBuffer(uploaded)
+    } else {
+      Papa.parse(uploaded, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          setParsedData(results.data)
+          setStep(2)
+          toast.success(`Successfully parsed ${results.data.length} records`)
+        },
+        error: (err) => {
+          toast.error(`Error parsing file: ${err.message}`)
+        },
+      })
+    }
   }
 
   const handleExecuteImport = async () => {
@@ -96,6 +117,8 @@ export default function ImportPage() {
       csv = `name,phone,email,address,city,state,pincode,type\nGurdev Singh,9812300099,gurdev@gmail.com,12 GT Road,Ludhiana,Punjab,141001,INDIVIDUAL\nKisan Sahakari Ltd,9823400088,info@kisansahakari.org,45 Market Rd,Pune,Maharashtra,411001,COMPANY`
     } else if (importType === 'SpareParts') {
       csv = `partNumber,partName,category,currentStock,minimumStock,unitPrice,supplier\nPRT-101,Fuel Injector Nozzle Bosch,Engine,25,8,4200,Bosch India\nPRT-102,Hydraulic Return Line Hose,Hydraulic,15,5,1850,Gates India`
+    } else if (importType === 'Tractor') {
+      csv = `chassisNumber,engineNumber,registrationNo,modelName,color,region,status,customerPhone,dealerId\nCHS9012026IN,ENG9012026IN,PB-02-AZ-9001,PowerMaster 45,Classic Red,North,ACTIVE,9871234001,DLR-001\nCHS9022026IN,ENG9022026IN,MH-12-BY-9002,AgriKing 50,Forest Green,West,ACTIVE,9871234002,DLR-002`
     } else {
       csv = `id,name,value\n1,Sample Record,100`
     }
@@ -171,12 +194,12 @@ export default function ImportPage() {
             <label className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer transition-colors bg-slate-50/50 hover:bg-blue-50/30 text-center">
               <UploadCloud className="w-10 h-10 text-blue-600 mb-3" />
               <p className="text-sm font-bold text-slate-800">
-                Click to browse or drop your CSV file here
+                Click to browse or drop your CSV or Excel file here
               </p>
-              <p className="text-xs text-slate-400 mt-1">Supports CSV, XLSX up to 25MB</p>
+              <p className="text-xs text-slate-400 mt-1">Supports CSV, XLSX, XLS up to 25MB</p>
               <input
                 type="file"
-                accept=".csv"
+                accept=".csv,.xlsx,.xls"
                 onChange={handleFileUpload}
                 className="hidden"
               />
