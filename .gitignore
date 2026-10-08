@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.production
 
 # vercel
 .vercel
@@ -41,8 +42,6 @@ yarn-error.log*
 next-env.d.ts
 
 # SQLite / Database
-*.db
 *.db-journal
-dev.db
-prisma/dev.db
+!prisma/dev.db
 
